@@ -1,0 +1,30 @@
+# Contexto local do Agente e Enunciado (NÃO enviar para o GitHub)
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
+.antigravity/
+CG20261_Trabalho_Final.pdf
+
+# Binários Linux e objetos temporários
+formiga
+garra
+*.o
+*.out
+test_bmp_loader
+
+# Pasta gerada localmente para entrega
+entrega_final/
+*.zip
+
+# Arquivos de sistema / IDE
+.vscode/
+.DS_Store
+
+# GARANTIR que texturas, códigos, manual e binários Windows NÃO sejam ignorados
+!*.bmp
+!*.cpp
+!*.h
+!Manual_Instrucoes.pdf
+!*.exe
+!*.dll
