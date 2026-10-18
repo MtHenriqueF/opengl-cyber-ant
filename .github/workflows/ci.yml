@@ -57,10 +57,11 @@ jobs:
       - name: Compilar executável para Windows
         run: make
 
-      - name: Copiar freeglut.dll para a pasta do executável
+      - name: Copiar DLLs do FreeGLUT para a pasta do executável
         run: |
-          cp /mingw64/bin/freeglut.dll .
-          ls -la *.exe freeglut.dll
+          cp /mingw64/bin/libfreeglut.dll .
+          cp libfreeglut.dll freeglut.dll
+          ls -la *.exe *.dll
 
       - name: Salvar binários do Windows como Artefato para entrega
         uses: actions/upload-artifact@v4
@@ -68,5 +69,6 @@ jobs:
           name: windows-binaries
           path: |
             *.exe
-            freeglut.dll
+            *.dll
             *.bmp
+
