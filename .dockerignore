@@ -1,0 +1,24 @@
+# Metadados do Git
+.git/
+.github/
+
+# Configurações de IA, documentação de agentes e IDEs
+.agents/
+AGENTS.md
+CLAUDE.md
+.antigravity/
+.vscode/
+.idea/
+
+# Binários e arquivos temporários compilados no host
+*.o
+*.out
+garra
+formiga
+*.exe
+*.dll
+
+# Pastas de entrega e arquivos compactados
+entrega_final/
+*.zip
+.DS_Store
