@@ -1,0 +1,74 @@
+name: CI OpenGL Cyber Ant
+
+on:
+  push:
+    branches: [ "main", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-linux:
+    name: Build & Smoke Test (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências OpenGL, GLUT e monitor virtual (Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential freeglut3-dev libglu1-mesa-dev xvfb
+
+      - name: Compilar projeto no Linux
+        run: make CXXFLAGS="-Wall -Wextra -O2"
+
+      - name: Testar execução do binário com OpenGL (Smoke Test headless)
+        run: |
+          BIN="./garra"
+          [ -f "./formiga" ] && BIN="./formiga"
+          echo "Testando inicialização gráfica de $BIN com monitor virtual Xvfb..."
+          xvfb-run -a timeout 2s $BIN || [ $? -eq 124 ]
+          echo "Execução bem-sucedida sem crashes!"
+
+  build-windows:
+    name: Build Windows (.exe + DLL)
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Clonar o repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar ambiente MSYS2 / MinGW com FreeGLUT
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-freeglut
+
+      - name: Compilar executável para Windows
+        run: make
+
+      - name: Copiar DLLs do FreeGLUT para a pasta do executável
+        run: |
+          cp /mingw64/bin/libfreeglut.dll .
+          cp libfreeglut.dll freeglut.dll
+          ls -la *.exe *.dll
+
+      - name: Salvar binários do Windows como Artefato para entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: |
+            *.exe
+            *.dll
+            *.bmp
+
