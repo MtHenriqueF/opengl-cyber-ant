@@ -35,13 +35,27 @@ GLUquadric* quadCylinder;
 // Estados globais de renderizacao
 bool textureOn = true;
 
-// Parametros de camera (baseados em garra.cpp, serao expandidos na Fase 1)
-float eyeDistance = 20.0f;
-float eyeX;
-float eyeY;
-float eyeZ;
-float viewAngleX = 45.0f;
-float viewAngleZ = 25.0f;
+// Constantes padrao de camera para reset (Fase 1)
+const float DEFAULT_EYE_DISTANCE = 20.0f;
+const float DEFAULT_VIEW_ANGLE_X = 45.0f;
+const float DEFAULT_VIEW_ANGLE_Z = 25.0f;
+const float DEFAULT_TARGET_X = 0.0f;
+const float DEFAULT_TARGET_Y = 0.0f;
+const float DEFAULT_TARGET_Z = 0.0f;
+
+// Parametros ativos de camera e centro de visao (Pan e Orbita)
+float eyeDistance = DEFAULT_EYE_DISTANCE;
+float viewAngleX  = DEFAULT_VIEW_ANGLE_X;
+float viewAngleZ  = DEFAULT_VIEW_ANGLE_Z;
+float targetX     = DEFAULT_TARGET_X;
+float targetY     = DEFAULT_TARGET_Y;
+float targetZ     = DEFAULT_TARGET_Z;
+float eyeX, eyeY, eyeZ;
+
+// Rastreamento do estado do mouse
+int mouseLastX = 0;
+int mouseLastY = 0;
+int mouseActiveButton = -1;
 
 // Carrega uma imagem BMP 24-bits via RgbImage e registra como textura OpenGL
 GLuint loadTexture(const char* filename) {
@@ -146,12 +160,64 @@ void drawReferenceGrid(void) {
     }
 }
 
+// Reseta a camera e enquadramento para os valores originais
+void resetCamera(void) {
+    eyeDistance = DEFAULT_EYE_DISTANCE;
+    viewAngleX  = DEFAULT_VIEW_ANGLE_X;
+    viewAngleZ  = DEFAULT_VIEW_ANGLE_Z;
+    targetX     = DEFAULT_TARGET_X;
+    targetY     = DEFAULT_TARGET_Y;
+    targetZ     = DEFAULT_TARGET_Z;
+    glutPostRedisplay();
+}
+
 void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
+    float radX = viewAngleX * (float)PI / 180.0f;
     switch (key) {
     case 27: // Tecla ESC
         exit(0);
+    // Reset de camera
+    case 'r':
+    case 'R':
+        resetCamera();
+        break;
+    // Zoom no teclado (+ / -)
+    case '+':
+    case '=':
+        if (eyeDistance > 3.0f) eyeDistance -= 1.0f;
+        glutPostRedisplay();
+        break;
+    case '-':
+    case '_':
+        if (eyeDistance < 60.0f) eyeDistance += 1.0f;
+        glutPostRedisplay();
+        break;
+    // Pan no teclado (I, K, J, L)
+    case 'i':
+    case 'I':
+        targetZ += 0.5f;
+        glutPostRedisplay();
+        break;
+    case 'k':
+    case 'K':
+        targetZ -= 0.5f;
+        glutPostRedisplay();
+        break;
+    case 'j':
+    case 'J':
+        targetX += (float)(-sin(radX) * 0.5f);
+        targetY += (float)( cos(radX) * 0.5f);
+        glutPostRedisplay();
+        break;
+    case 'l':
+    case 'L':
+        targetX -= (float)(-sin(radX) * 0.5f);
+        targetY -= (float)( cos(radX) * 0.5f);
+        glutPostRedisplay();
+        break;
+    // Compatibilidade com garra.cpp (w, s, a, d)
     case 'w':
-        if (viewAngleZ < 175.0f) viewAngleZ += 3.0f;
+        if (viewAngleZ < 85.0f) viewAngleZ += 3.0f;
         glutPostRedisplay();
         break;
     case 'z':
@@ -186,14 +252,67 @@ void handleSpecialKeypress(int key, int /*x*/, int /*y*/) {
         viewAngleX += 3.0f;
         glutPostRedisplay();
         break;
-    case GLUT_KEY_UP:    // Gira para cima
-        if (viewAngleZ < 175.0f) viewAngleZ += 3.0f;
+    case GLUT_KEY_UP:    // Eleva a visao
+        if (viewAngleZ < 85.0f) viewAngleZ += 3.0f;
         glutPostRedisplay();
         break;
-    case GLUT_KEY_DOWN:  // Gira para baixo
+    case GLUT_KEY_DOWN:  // Abaixa a visao
         if (viewAngleZ > -85.0f) viewAngleZ -= 3.0f;
         glutPostRedisplay();
         break;
+    }
+}
+
+// Captura cliques do mouse e roda de scroll (FreeGLUT: button 3=up, 4=down)
+void handleMouse(int button, int state, int x, int y) {
+    if (state == GLUT_DOWN) {
+        if (button == GLUT_LEFT_BUTTON || button == GLUT_RIGHT_BUTTON) {
+            mouseActiveButton = button;
+            mouseLastX = x;
+            mouseLastY = y;
+        } else if (button == 3) { // Scroll Up (Zoom In)
+            if (eyeDistance > 3.0f) eyeDistance -= 1.0f;
+            glutPostRedisplay();
+        } else if (button == 4) { // Scroll Down (Zoom Out)
+            if (eyeDistance < 60.0f) eyeDistance += 1.0f;
+            glutPostRedisplay();
+        }
+    } else if (state == GLUT_UP) {
+        if (button == mouseActiveButton) {
+            mouseActiveButton = -1;
+        }
+    }
+}
+
+// Movimento do mouse arrastado (Botao Esquerdo = Orbita, Botao Direito = Pan)
+void handleMouseMotion(int x, int y) {
+    int deltaX = x - mouseLastX;
+    int deltaY = y - mouseLastY;
+    mouseLastX = x;
+    mouseLastY = y;
+
+    if (mouseActiveButton == GLUT_LEFT_BUTTON) {
+        // Orbita esferica interativa
+        viewAngleX += (float)deltaX * 0.4f;
+        viewAngleZ += (float)deltaY * 0.4f;
+        if (viewAngleZ > 85.0f)  viewAngleZ = 85.0f;
+        if (viewAngleZ < -85.0f) viewAngleZ = -85.0f;
+        glutPostRedisplay();
+    } else if (mouseActiveButton == GLUT_RIGHT_BUTTON) {
+        // Pan no plano de visualizacao relativo a camera (direcao invertida a pedido do usuario)
+        float radX = viewAngleX * (float)PI / 180.0f;
+        float radZ = viewAngleZ * (float)PI / 180.0f;
+        float panFactor = eyeDistance * 0.003f;
+
+        // Direcao invertida para arrasto mais intuitivo
+        targetX -= (float)(-sin(radX) * deltaX) * panFactor;
+        targetY -= (float)( cos(radX) * deltaX) * panFactor;
+
+        targetZ -= (float)(deltaY) * panFactor;
+        targetX -= (float)(cos(radX) * sin(radZ) * deltaY) * panFactor * 0.5f;
+        targetY -= (float)(sin(radX) * sin(radZ) * deltaY) * panFactor * 0.5f;
+
+        glutPostRedisplay();
     }
 }
 
@@ -217,20 +336,16 @@ void drawScene(void) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    eyeX = eyeDistance * (float)(cos(viewAngleZ * PI / 180.0) * cos(viewAngleX * PI / 180.0));
-    eyeY = eyeDistance * (float)(cos(viewAngleZ * PI / 180.0) * sin(viewAngleX * PI / 180.0));
-    eyeZ = eyeDistance * (float)(sin(viewAngleZ * PI / 180.0));
+    eyeX = targetX + eyeDistance * (float)(cos(viewAngleZ * PI / 180.0) * cos(viewAngleX * PI / 180.0));
+    eyeY = targetY + eyeDistance * (float)(cos(viewAngleZ * PI / 180.0) * sin(viewAngleX * PI / 180.0));
+    eyeZ = targetZ + eyeDistance * (float)(sin(viewAngleZ * PI / 180.0));
 
-    if (cos(viewAngleZ * PI / 180.0) >= 0.0) {
-        gluLookAt(eyeX, eyeY, eyeZ, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
-    } else {
-        gluLookAt(eyeX, eyeY, eyeZ, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0);
-    }
+    gluLookAt(eyeX, eyeY, eyeZ, targetX, targetY, targetZ, 0.0, 0.0, 1.0);
 
     // Grade de chao para referencia espacial
     drawReferenceGrid();
 
-    // Raiz do modelo (Placeholder do Torax para validacao da Fase 0)
+    // Raiz do modelo (Placeholder do Torax para validacao)
     glColor3f(1.0f, 1.0f, 1.0f);
     glPushMatrix();
         drawSphere(1.5f);
@@ -249,6 +364,8 @@ int main(int argc, char** argv) {
     glutDisplayFunc(drawScene);
     glutKeyboardFunc(handleKeypress);
     glutSpecialFunc(handleSpecialKeypress);
+    glutMouseFunc(handleMouse);
+    glutMotionFunc(handleMouseMotion);
     glutReshapeFunc(handleResize);
 
     glutMainLoop();
