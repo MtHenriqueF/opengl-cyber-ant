@@ -60,6 +60,11 @@ float antennaAngle  = 10.0f;  // Articulacao das antenas (-10 a +25 graus)
 float abdomenPitch  = 0.0f;   // Inclinacao vertical do abdomen/gaster (-25 a +25 graus)
 float abdomenYaw    = 0.0f;   // Movimento lateral do abdomen/gaster (-25 a +25 graus)
 
+// Articulacoes das 6 Patas (Fase 3: Coxa -> Femur -> Tibia)
+float legManualCoxa  = 0.0f;  // Articulacao horizontal Yaw das patas (-20 a +20 graus)
+float legManualFemur = 0.0f;  // Articulacao vertical Pitch do femur (-20 a +20 graus)
+float legManualTibia = 0.0f;  // Articulacao vertical Pitch da tibia (-20 a +20 graus)
+
 // Rastreamento do estado do mouse
 int mouseLastX = 0;
 int mouseLastY = 0;
@@ -151,16 +156,16 @@ void drawSphere(float diameter) {
     gluSphere(quadSphere, diameter, 32, 32);
 }
 
-// Grade de referencia no plano Z = -2.5 para orientacao espacial
+// Grade de referencia no plano de apoio das patas (Z = -1.65f) para orientacao espacial
 void drawReferenceGrid(void) {
     glDisable(GL_TEXTURE_2D);
     glColor3f(0.25f, 0.30f, 0.35f);
     glBegin(GL_LINES);
     for (int i = -15; i <= 15; i += 2) {
-        glVertex3f((float)i, -15.0f, -2.5f);
-        glVertex3f((float)i,  15.0f, -2.5f);
-        glVertex3f(-15.0f, (float)i, -2.5f);
-        glVertex3f( 15.0f, (float)i, -2.5f);
+        glVertex3f((float)i, -15.0f, -1.65f);
+        glVertex3f((float)i,  15.0f, -1.65f);
+        glVertex3f(-15.0f, (float)i, -1.65f);
+        glVertex3f( 15.0f, (float)i, -1.65f);
     }
     glEnd();
     if (textureOn) {
@@ -182,6 +187,9 @@ void resetCamera(void) {
     antennaAngle  = 10.0f;
     abdomenPitch  = 0.0f;
     abdomenYaw    = 0.0f;
+    legManualCoxa  = 0.0f;
+    legManualFemur = 0.0f;
+    legManualTibia = 0.0f;
     glutPostRedisplay();
 }
 
@@ -361,6 +369,115 @@ void drawAbdomen(void) {
     glPopMatrix();
 }
 
+// Desenha uma pata articulada anatomica (Coxa -> Femur -> Tibia -> Garra)
+void drawLeg(int side, int legIdx, float coxaYaw, float femurPitch, float tibiaPitch) {
+    glPushMatrix();
+        float s = (float)side; // +1.0f para Direita, -1.0f para Esquerda
+
+        // Parametros anatomicos dos 3 pares de patas (Dianteira, Media, Traseira)
+        float attachX   = 0.0f;
+        float attachY   = 0.0f;
+        float attachZ   = -0.18f;
+        float baseYaw   = 0.0f;
+        float femurElev = 0.0f;
+        float femurLen  = 0.0f;
+        float tibiaElev = 0.0f;
+        float tibiaLen  = 0.0f;
+
+        if (legIdx == 0) {
+            // Pata Dianteira (Protorax: aponta para frente e para fora)
+            attachX   = s * 0.54f;
+            attachY   = 0.80f;
+            baseYaw   = 38.0f;
+            femurElev = 48.0f;
+            femurLen  = 1.60f;
+            tibiaElev = -65.0f;
+            tibiaLen  = 2.87f;
+        } else if (legIdx == 1) {
+            // Pata Media (Mesotorax: aponta lateralmente/levemente para tras)
+            attachX   = s * 0.46f;
+            attachY   = -0.05f;
+            baseYaw   = -10.0f;
+            femurElev = 52.0f;
+            femurLen  = 1.80f;
+            tibiaElev = -65.0f;
+            tibiaLen  = 3.12f;
+        } else {
+            // Pata Traseira (Metatorax: a mais longa, aponta bem para tras)
+            attachX   = s * 0.48f;
+            attachY   = -0.85f;
+            baseYaw   = -55.0f;
+            femurElev = 42.0f;
+            femurLen  = 2.15f;
+            tibiaElev = -58.0f;
+            tibiaLen  = 3.36f;
+        }
+
+        // 1. Posiciona no ponto de encaixe lateral do torax
+        glTranslatef(attachX, attachY, attachZ);
+
+        // 2. Rotacao horizontal Yaw da pata (base + controle dinamico)
+        glRotatef(s * (baseYaw + coxaYaw), 0.0f, 0.0f, 1.0f);
+
+        // Junta basal da coxa (esfera no torax)
+        drawSphere(0.10f);
+
+        // --- SEGMENTO 1: COXA ---
+        // Projeta a coxa para fora com leve inclinacao para baixo (-10 graus)
+        float coxaElev = -10.0f;
+        float coxaLen  = 0.35f;
+        glPushMatrix();
+            glRotatef(s * (90.0f - coxaElev), 0.0f, 1.0f, 0.0f);
+            drawCylinder(0.085f, coxaLen);
+        glPopMatrix();
+
+        // Translada com precisao analitica ate o trocanter (fim da coxa)
+        float radCoxa = coxaElev * (float)PI / 180.0f;
+        glTranslatef(s * coxaLen * (float)cos(radCoxa), 0.0f, coxaLen * (float)sin(radCoxa));
+
+        // Junta do trocanter (coxa-femur)
+        drawSphere(0.095f);
+
+        // --- SEGMENTO 2: FEMUR ---
+        // Sobe em angulo elevado ate o joelho alto (arco anatomico do inseto)
+        float curFemurElev = femurElev + femurPitch;
+        float radFemur = curFemurElev * (float)PI / 180.0f;
+        glPushMatrix();
+            glRotatef(s * (90.0f - curFemurElev), 0.0f, 1.0f, 0.0f);
+            drawCylinder(0.075f, femurLen);
+        glPopMatrix();
+
+        // Translada analiticamente ate o joelho
+        glTranslatef(s * femurLen * (float)cos(radFemur), 0.0f, femurLen * (float)sin(radFemur));
+
+        // Junta do joelho (femur-tibia)
+        drawSphere(0.085f);
+
+        // --- SEGMENTO 3: TIBIA E GARRA ---
+        // Desce em direcao ao solo no plano exato de apoio Z = -1.65f
+        float curTibiaElev = tibiaElev + tibiaPitch;
+        glRotatef(s * (90.0f - curTibiaElev), 0.0f, 1.0f, 0.0f);
+
+        float mainTibia = tibiaLen * 0.72f;
+        float clawLen   = tibiaLen * 0.28f;
+        drawCylinder(0.055f, mainTibia);
+        glTranslatef(0.0f, 0.0f, mainTibia);
+
+        // Garra afilada tocando o piso
+        drawCone(0.055f, clawLen);
+    glPopMatrix();
+}
+
+// Desenha os 3 pares de patas articuladas (6 patas no total)
+void drawAllLegs(void) {
+    for (int legIdx = 0; legIdx < 3; legIdx++) {
+        // Pata Direita (side = +1)
+        drawLeg(1, legIdx, legManualCoxa, legManualFemur, legManualTibia);
+        // Pata Esquerda (side = -1)
+        drawLeg(-1, legIdx, -legManualCoxa, legManualFemur, legManualTibia);
+    }
+}
+
 void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
     switch (key) {
     case 27: // Tecla ESC
@@ -431,6 +548,31 @@ void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
         break;
     case 'N': // Move o abdomen para o outro lado
         if (abdomenYaw > -25.0f) abdomenYaw -= 2.5f;
+        glutPostRedisplay();
+        break;
+    // Articulacao manual das 6 Patas (Fase 3: teclas 1/2, 3/4, 5/6)
+    case '1': // Articula a coxa para frente (Yaw)
+        if (legManualCoxa < 20.0f) legManualCoxa += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '2': // Articula a coxa para tras (Yaw)
+        if (legManualCoxa > -20.0f) legManualCoxa -= 2.0f;
+        glutPostRedisplay();
+        break;
+    case '3': // Eleva os femures (Pitch)
+        if (legManualFemur < 20.0f) legManualFemur += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '4': // Abaixa os femures (Pitch)
+        if (legManualFemur > -20.0f) legManualFemur -= 2.0f;
+        glutPostRedisplay();
+        break;
+    case '5': // Flexiona as tibias
+        if (legManualTibia < 20.0f) legManualTibia += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '6': // Estende as tibias
+        if (legManualTibia > -20.0f) legManualTibia -= 2.0f;
         glutPostRedisplay();
         break;
     // Pan vertical no teclado (I / K)
@@ -585,6 +727,9 @@ void drawScene(void) {
 
     // 3. Peciolo, Abdomen (Gaster) e Ferrao (filhos posteriores do Torax)
     drawAbdomen();
+
+    // 4. Seis patas articuladas anatomicas (3 de cada lado conectadas ao Torax)
+    drawAllLegs();
 
     glutSwapBuffers();
 }
