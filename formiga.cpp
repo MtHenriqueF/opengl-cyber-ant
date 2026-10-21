@@ -145,9 +145,9 @@ void initRendering(void) {
     // Modo de ambiente de textura: GL_MODULATE para interacao entre iluminacao e imagem BMP
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-    // Configuracao de Materiais Metalicos Especulares (aspecto cibernetico rigido)
-    GLfloat matSpecular[]  = { 0.90f, 0.90f, 0.95f, 1.0f };
-    GLfloat matShininess[] = { 85.0f }; // Brilho especular elevado entre 70.0f e 90.0f
+    // Configuracao de Materiais Metalicos Especulares (aspecto cibernetico rigido de alta reflectancia)
+    GLfloat matSpecular[]  = { 1.0f, 1.0f, 1.0f, 1.0f }; // Reflectancia especular maxima pura (espelho metalico)
+    GLfloat matShininess[] = { 90.0f };                   // Brilho especular maximo (ponto de luz concentrado e vivo)
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpecular);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, matShininess);
 
@@ -155,27 +155,39 @@ void initRendering(void) {
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
+    // Visualizador local: calcula os vetores de reflexao especular exatos para cada vertice em relacao a camera
+    glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+
     // Separacao da cor especular: adiciona o brilho metalico brilhante sobre a textura BMP
     #ifdef GL_LIGHT_MODEL_COLOR_CONTROL
     glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
     #endif
 
-    // Configuracao de Iluminacao (Fonte de Luz 0 e Luz 1 de Preenchimento)
+    // Configuracao de Iluminacao Avancada de 3 Pontos (Key Light, Fill/Rim Light e Dorsal Overhead Light)
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glEnable(GL_LIGHT1);
+    glEnable(GL_LIGHT2);
 
-    GLfloat light0Ambient[]  = { 0.22f, 0.22f, 0.25f, 1.0f };
-    GLfloat light0Diffuse[]  = { 0.85f, 0.85f, 0.90f, 1.0f };
+    // Luz 0: Principal (Key Light) - Incidencia frontal-lateral intensa
+    GLfloat light0Ambient[]  = { 0.28f, 0.28f, 0.32f, 1.0f };
+    GLfloat light0Diffuse[]  = { 1.0f,  1.0f,  1.0f,  1.0f };
     GLfloat light0Specular[] = { 1.0f,  1.0f,  1.0f,  1.0f };
     glLightfv(GL_LIGHT0, GL_AMBIENT,  light0Ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE,  light0Diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light0Specular);
 
-    GLfloat light1Diffuse[]  = { 0.35f, 0.35f, 0.40f, 1.0f };
-    GLfloat light1Specular[] = { 0.30f, 0.30f, 0.35f, 1.0f };
+    // Luz 1: Preenchimento e Recorte (Fill/Rim Light) - Incidencia oposta traseira
+    GLfloat light1Diffuse[]  = { 0.60f, 0.60f, 0.70f, 1.0f };
+    GLfloat light1Specular[] = { 0.85f, 0.85f, 0.95f, 1.0f };
     glLightfv(GL_LIGHT1, GL_DIFFUSE,  light1Diffuse);
     glLightfv(GL_LIGHT1, GL_SPECULAR, light1Specular);
+
+    // Luz 2: Luz de Crista Superior (Dorsal Overhead Light) - Realca a espinha e cristas curvas do dorso
+    GLfloat light2Diffuse[]  = { 0.50f, 0.50f, 0.55f, 1.0f };
+    GLfloat light2Specular[] = { 0.95f, 0.95f, 1.0f,  1.0f };
+    glLightfv(GL_LIGHT2, GL_DIFFUSE,  light2Diffuse);
+    glLightfv(GL_LIGHT2, GL_SPECULAR, light2Specular);
 
     quadSphere = gluNewQuadric();
     gluQuadricNormals(quadSphere, GLU_SMOOTH);
@@ -861,11 +873,13 @@ void drawScene(void) {
 
     gluLookAt(eyeX, eyeY, eyeZ, targetX, targetY, targetZ, 0.0, 0.0, 1.0);
 
-    // Posicionamento espacial das luzes no referencial do mundo (fixas na cena)
-    GLfloat light0Pos[] = { 10.0f, -8.0f, 14.0f, 1.0f };
-    GLfloat light1Pos[] = { -10.0f, 8.0f, -6.0f, 1.0f };
+    // Posicionamento espacial das 3 fontes de luz no referencial do mundo (fixas na cena)
+    GLfloat light0Pos[] = { 12.0f, -10.0f, 16.0f, 1.0f }; // Luz Principal (frontal direita alta)
+    GLfloat light1Pos[] = { -12.0f, 10.0f,  6.0f, 1.0f }; // Luz de Recorte (traseira esquerda)
+    GLfloat light2Pos[] = {   0.0f,  0.0f, 20.0f, 1.0f }; // Luz de Crista (zenital/topo)
     glLightfv(GL_LIGHT0, GL_POSITION, light0Pos);
     glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
+    glLightfv(GL_LIGHT2, GL_POSITION, light2Pos);
 
     // Grade de chao (desenhada sem iluminacao e sem textura para contraste puro)
     glDisable(GL_LIGHTING);
