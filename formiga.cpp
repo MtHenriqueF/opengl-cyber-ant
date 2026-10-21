@@ -60,6 +60,19 @@ float antennaAngle  = 10.0f;  // Articulacao das antenas (-10 a +25 graus)
 float abdomenPitch  = 0.0f;   // Inclinacao vertical do abdomen/gaster (-25 a +25 graus)
 float abdomenYaw    = 0.0f;   // Movimento lateral do abdomen/gaster (-25 a +25 graus)
 
+// Articulacoes das 6 Patas (Fase 3: Coxa -> Femur -> Tibia)
+float legManualCoxa  = 0.0f;  // Articulacao horizontal Yaw das patas (-20 a +20 graus)
+float legManualFemur = 0.0f;  // Articulacao vertical Pitch do femur (-20 a +20 graus)
+float legManualTibia = 0.0f;  // Articulacao vertical Pitch da tibia (-20 a +20 graus)
+
+// Parametros da Marcha Tripod Gait (Fase 4: Coordenadas e Cinematica 3D)
+bool isWalking             = false;   // Estado da caminhada automatica (Espaco liga/desliga)
+float walkCycle            = 0.0f;    // Variavel temporal do ciclo senoidal da marcha
+const float WALK_SPEED     = 0.09f;   // Frequencia angular do passo (~60 FPS)
+const float WALK_AMP_COXA  = 16.0f;   // Amplitude horizontal Yaw de avanco/recuo da coxa (graus)
+const float WALK_AMP_FEMUR = 14.0f;   // Amplitude vertical Pitch de elevacao do joelho (graus)
+const float WALK_AMP_TIBIA = 6.0f;    // Amplitude de flexao compensatoria da tibia no ar (graus)
+
 // Rastreamento do estado do mouse
 int mouseLastX = 0;
 int mouseLastY = 0;
@@ -151,16 +164,16 @@ void drawSphere(float diameter) {
     gluSphere(quadSphere, diameter, 32, 32);
 }
 
-// Grade de referencia no plano Z = -2.5 para orientacao espacial
+// Grade de referencia no plano de apoio das patas (Z = -1.65f) para orientacao espacial
 void drawReferenceGrid(void) {
     glDisable(GL_TEXTURE_2D);
     glColor3f(0.25f, 0.30f, 0.35f);
     glBegin(GL_LINES);
     for (int i = -15; i <= 15; i += 2) {
-        glVertex3f((float)i, -15.0f, -2.5f);
-        glVertex3f((float)i,  15.0f, -2.5f);
-        glVertex3f(-15.0f, (float)i, -2.5f);
-        glVertex3f( 15.0f, (float)i, -2.5f);
+        glVertex3f((float)i, -15.0f, -1.65f);
+        glVertex3f((float)i,  15.0f, -1.65f);
+        glVertex3f(-15.0f, (float)i, -1.65f);
+        glVertex3f( 15.0f, (float)i, -1.65f);
     }
     glEnd();
     if (textureOn) {
@@ -182,6 +195,11 @@ void resetCamera(void) {
     antennaAngle  = 10.0f;
     abdomenPitch  = 0.0f;
     abdomenYaw    = 0.0f;
+    legManualCoxa  = 0.0f;
+    legManualFemur = 0.0f;
+    legManualTibia = 0.0f;
+    isWalking      = false;
+    walkCycle      = 0.0f;
     glutPostRedisplay();
 }
 
@@ -361,10 +379,144 @@ void drawAbdomen(void) {
     glPopMatrix();
 }
 
+// Desenha uma pata articulada anatomica (Coxa -> Femur -> Tibia -> Garra)
+void drawLeg(int side, int legIdx, float coxaYaw, float femurPitch, float tibiaPitch) {
+    glPushMatrix();
+        float s = (float)side; // +1.0f para Direita, -1.0f para Esquerda
+
+        // Parametros anatomicos dos 3 pares de patas (Dianteira, Media, Traseira)
+        float attachX   = 0.0f;
+        float attachY   = 0.0f;
+        float attachZ   = -0.18f;
+        float baseYaw   = 0.0f;
+        float femurElev = 0.0f;
+        float femurLen  = 0.0f;
+        float tibiaElev = 0.0f;
+        float tibiaLen  = 0.0f;
+
+        if (legIdx == 0) {
+            // Pata Dianteira (Protorax: aponta para frente e para fora)
+            attachX   = s * 0.54f;
+            attachY   = 0.80f;
+            baseYaw   = 38.0f;
+            femurElev = 48.0f;
+            femurLen  = 1.60f;
+            tibiaElev = -65.0f;
+            tibiaLen  = 2.87f;
+        } else if (legIdx == 1) {
+            // Pata Media (Mesotorax: aponta lateralmente/levemente para tras)
+            attachX   = s * 0.46f;
+            attachY   = -0.05f;
+            baseYaw   = -10.0f;
+            femurElev = 52.0f;
+            femurLen  = 1.80f;
+            tibiaElev = -65.0f;
+            tibiaLen  = 3.12f;
+        } else {
+            // Pata Traseira (Metatorax: a mais longa, aponta bem para tras)
+            attachX   = s * 0.48f;
+            attachY   = -0.85f;
+            baseYaw   = -55.0f;
+            femurElev = 42.0f;
+            femurLen  = 2.15f;
+            tibiaElev = -58.0f;
+            tibiaLen  = 3.36f;
+        }
+
+        // 1. Referencial da Base / Quadril (ponto de encaixe lateral no Torax)
+        glTranslatef(attachX, attachY, attachZ);
+        glRotatef(s * (baseYaw + coxaYaw), 0.0f, 0.0f, 1.0f);
+        drawSphere(0.10f);
+
+        // --- ELO 1 DO BRACO MECANICO: REFERENCIAL DA COXA ---
+        // Rotaciona o referencial para alinhar o eixo +Z local com a coxa (-10 graus)
+        float coxaElev = -10.0f;
+        float coxaLen  = 0.35f;
+        glRotatef(s * (90.0f - coxaElev), 0.0f, 1.0f, 0.0f);
+        drawCylinder(0.085f, coxaLen);
+
+        // --- ELO 2 DO BRACO MECANICO: REFERENCIAL DO FEMUR (TROCANTER) ---
+        // Translada puramente ao longo do eixo +Z local da coxa (padrao garra.cpp)
+        glTranslatef(0.0f, 0.0f, coxaLen);
+        drawSphere(0.095f);
+
+        // Rotacao relativa entre o referencial da Coxa e o do Femur + articulacao femurPitch
+        glRotatef(s * ((coxaElev - femurElev) - femurPitch), 0.0f, 1.0f, 0.0f);
+        drawCylinder(0.075f, femurLen);
+
+        // --- ELO 3 DO BRACO MECANICO: REFERENCIAL DA TIBIA (JOELHO) ---
+        // Translada puramente ao longo do eixo +Z local do femur ate o joelho
+        glTranslatef(0.0f, 0.0f, femurLen);
+        drawSphere(0.085f);
+
+        // Rotacao relativa do joelho (entre o Femur e a Tibia) + articulacao tibiaPitch
+        glRotatef(s * ((femurElev - tibiaElev) - tibiaPitch), 0.0f, 1.0f, 0.0f);
+
+        float mainTibia = tibiaLen * 0.72f;
+        float clawLen   = tibiaLen * 0.28f;
+        drawCylinder(0.055f, mainTibia);
+
+        // --- ELO 4 DO BRACO MECANICO: REFERENCIAL DA GARRA (TARSO) ---
+        // Translada puramente ao longo do eixo +Z local da tibia ate a ponta da garra
+        glTranslatef(0.0f, 0.0f, mainTibia);
+        drawCone(0.055f, clawLen);
+    glPopMatrix();
+}
+
+// Desenha os 3 pares de patas articuladas (6 patas no total) com cinematica de Tripod Gait
+void drawAllLegs(void) {
+    for (int legIdx = 0; legIdx < 3; legIdx++) {
+        // Itera para ambos os lados: Direita (side = +1) e Esquerda (side = -1)
+        for (int sIdx = 0; sIdx < 2; sIdx++) {
+            int side = (sIdx == 0) ? 1 : -1;
+            float walkCoxa  = 0.0f;
+            float walkFemur = 0.0f;
+            float walkTibia = 0.0f;
+
+            if (isWalking) {
+                // Tripod Gait (Marcha em Tripe de 6 patas):
+                // Tripe A: Dianteira Esquerda (side=-1, leg=0), Media Direita (side=+1, leg=1), Traseira Esquerda (side=-1, leg=2)
+                // Tripe B: Dianteira Direita (side=+1, leg=0), Media Esquerda (side=-1, leg=1), Traseira Direita (side=+1, leg=2)
+                bool isTripodA = ((side == -1 && legIdx != 1) || (side == 1 && legIdx == 1));
+
+                float phase = isTripodA ? walkCycle : (walkCycle + (float)PI);
+                float sinPhase = (float)sin(phase);
+                float cosPhase = (float)cos(phase);
+
+                // 1. Articulacao Yaw da Coxa (Avanco / Recuo):
+                // Durante a fase de balanco no ar (sinPhase > 0), a pata viaja para frente (-cos vai de -1 a +1).
+                // Durante a fase de apoio no solo (sinPhase <= 0), a pata empurra o chao para tras (-cos vai de +1 a -1).
+                walkCoxa = -WALK_AMP_COXA * cosPhase;
+
+                // 2. Articulacao Pitch do Femur (Elevacao do Joelho):
+                // No ar (sinPhase > 0): eleva o joelho para descolar a garra do solo.
+                // No solo (sinPhase <= 0): garra apoia firmemente no plano de referencia Z = -1.65f.
+                if (sinPhase > 0.0f) {
+                    walkFemur = WALK_AMP_FEMUR * sinPhase;
+                    // 3. Flexao compensatoria da tibia no ar para afastar a ponta do chao
+                    walkTibia = -WALK_AMP_TIBIA * sinPhase;
+                }
+            }
+
+            // Composicao cinematica: angulos dinamicos da marcha + articulacao manual
+            float finalCoxa  = legManualCoxa + walkCoxa;
+            float finalFemur = legManualFemur + walkFemur;
+            float finalTibia = legManualTibia + walkTibia;
+
+            drawLeg(side, legIdx, finalCoxa, finalFemur, finalTibia);
+        }
+    }
+}
+
 void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
     switch (key) {
     case 27: // Tecla ESC
         exit(0);
+    // Modo de Caminhada (Tripod Gait): Liga/Desliga marcha automatica (Espaco)
+    case ' ':
+        isWalking = !isWalking;
+        glutPostRedisplay();
+        break;
     // Reset de camera e articulacoes
     case 'r':
     case 'R':
@@ -431,6 +583,31 @@ void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
         break;
     case 'N': // Move o abdomen para o outro lado
         if (abdomenYaw > -25.0f) abdomenYaw -= 2.5f;
+        glutPostRedisplay();
+        break;
+    // Articulacao manual das 6 Patas (Fase 3: teclas 1/2, 3/4, 5/6)
+    case '1': // Articula a coxa para frente (Yaw)
+        if (legManualCoxa < 20.0f) legManualCoxa += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '2': // Articula a coxa para tras (Yaw)
+        if (legManualCoxa > -20.0f) legManualCoxa -= 2.0f;
+        glutPostRedisplay();
+        break;
+    case '3': // Eleva os femures (Pitch)
+        if (legManualFemur < 20.0f) legManualFemur += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '4': // Abaixa os femures (Pitch)
+        if (legManualFemur > -20.0f) legManualFemur -= 2.0f;
+        glutPostRedisplay();
+        break;
+    case '5': // Flexiona as tibias
+        if (legManualTibia < 20.0f) legManualTibia += 2.0f;
+        glutPostRedisplay();
+        break;
+    case '6': // Estende as tibias
+        if (legManualTibia > -20.0f) legManualTibia -= 2.0f;
         glutPostRedisplay();
         break;
     // Pan vertical no teclado (I / K)
@@ -586,7 +763,23 @@ void drawScene(void) {
     // 3. Peciolo, Abdomen (Gaster) e Ferrao (filhos posteriores do Torax)
     drawAbdomen();
 
+    // 4. Seis patas articuladas anatomicas (3 de cada lado conectadas ao Torax)
+    drawAllLegs();
+
     glutSwapBuffers();
+}
+
+// Callback de temporizador para animacao fluida da marcha (~60 FPS)
+void updateAnimation(int value) {
+    (void)value;
+    if (isWalking) {
+        walkCycle += WALK_SPEED;
+        if (walkCycle > 2.0f * (float)PI) {
+            walkCycle -= 2.0f * (float)PI;
+        }
+        glutPostRedisplay();
+    }
+    glutTimerFunc(16, updateAnimation, 0);
 }
 
 int main(int argc, char** argv) {
@@ -602,6 +795,7 @@ int main(int argc, char** argv) {
     glutMouseFunc(handleMouse);
     glutMotionFunc(handleMouseMotion);
     glutReshapeFunc(handleResize);
+    glutTimerFunc(16, updateAnimation, 0);
 
     glutMainLoop();
     return 0;
