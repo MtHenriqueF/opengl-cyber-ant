@@ -155,6 +155,11 @@ void initRendering(void) {
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
+    // Separacao da cor especular: adiciona o brilho metalico brilhante sobre a textura BMP
+    #ifdef GL_LIGHT_MODEL_COLOR_CONTROL
+    glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
+    #endif
+
     // Configuracao de Iluminacao (Fonte de Luz 0 e Luz 1 de Preenchimento)
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
