@@ -22,13 +22,23 @@
 
 using namespace std;
 
-// Caminho relativo para textura conforme regras de portabilidade
-const char* filenameTexMetal1 = "metalTexture1.bmp";
+// Caminho relativo para textura padrao e texturas especializadas de _temp_textures
+const char* filenameTexMetal1   = "metalTexture1.bmp";
+const char* filenameCarbonFiber = "_temp_textures/carbon_fiber1.bmp";
+const char* filenameCorrugated  = "_temp_textures/corrugated_iron.bmp";
+const char* filenameGrayMetal   = "_temp_textures/gray_metal.bmp";
+const char* filenamePerforated  = "_temp_textures/perforated_metal.bmp";
 
-// Identificadores de textura e quadricas GLU
-GLuint _textureIdMetal1;
-GLuint _textureIdSphere;
-GLuint _textureIdCylinder;
+// Identificadores de textura multi-materiais (Fase 5)
+GLuint _texCarbonFiber   = 0; // 1. Carapaca Principal (Cabeca, Torax e Abdomen/Gaster)
+GLuint _texCorrugated    = 0; // 2. Cintura (Peciolo e Pos-peciolo) e Articulacoes das Pernas
+GLuint _texGrayMetal     = 0; // 3. Segmentos das Pernas e Antenas / Mandibulas / Ferrao
+GLuint _texPerforated    = 0; // 4. Olhos Compostos
+
+// Identificadores herdados de garra.cpp e quadricas GLU
+GLuint _textureIdMetal1   = 0;
+GLuint _textureIdSphere   = 0;
+GLuint _textureIdCylinder = 0;
 GLUquadric* quadSphere;
 GLUquadric* quadCylinder;
 
@@ -78,31 +88,99 @@ int mouseLastX = 0;
 int mouseLastY = 0;
 int mouseActiveButton = -1;
 
-// Carrega uma imagem BMP 24-bits via RgbImage e registra como textura OpenGL
+// Carrega uma imagem BMP 24-bits via RgbImage e registra como textura OpenGL com filtragem mipmap
 GLuint loadTexture(const char* filename) {
-    GLuint textureId;
+    GLuint textureId = 0;
     RgbImage theTexMap(filename);
+
+    // Tenta fallback com prefixo _temp_textures/ caso seja passado caminho relativo direto
+    if (theTexMap.GetErrorCode() != 0 || theTexMap.GetNumCols() <= 0) {
+        char altPath[256];
+        snprintf(altPath, sizeof(altPath), "_temp_textures/%s", filename);
+        theTexMap.LoadBmpFile(altPath);
+    }
+
+    if (theTexMap.GetErrorCode() != 0 || theTexMap.GetNumCols() <= 0 || theTexMap.GetNumRows() <= 0) {
+        return 0;
+    }
 
     glGenTextures(1, &textureId);
     glBindTexture(GL_TEXTURE_2D, textureId);
-    glTexImage2D(GL_TEXTURE_2D,
-        0,
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    gluBuild2DMipmaps(GL_TEXTURE_2D,
         GL_RGB,
         theTexMap.GetNumCols(),
         theTexMap.GetNumRows(),
-        0,
         GL_RGB,
         GL_UNSIGNED_BYTE,
         theTexMap.ImageData());
+
     return textureId;
 }
 
-// Inicializa recursos de renderizacao, quadricas e texturas
+// Aplica a textura especifica e a cor base com suporte a modulacao e iluminacao
+void applyTexture(GLuint texId, float r, float g, float b) {
+    if (textureOn && texId != 0) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, texId);
+        _textureIdCylinder = texId;
+        _textureIdSphere   = texId;
+    } else {
+        glDisable(GL_TEXTURE_2D);
+    }
+    glColor3f(r, g, b);
+}
+
+// Inicializa recursos de renderizacao, iluminacao, materiais e texturas
 void initRendering(void) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_NORMALIZE);
     glShadeModel(GL_SMOOTH);
-    glClearColor(0.08f, 0.09f, 0.12f, 1.0f);
+    glClearColor(0.06f, 0.07f, 0.09f, 1.0f);
+
+    // Modo de ambiente de textura: GL_MODULATE para interacao entre iluminacao e imagem BMP
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+    // Configuracao de Materiais Metalicos Especulares (aspecto cibernetico rigido e equilibrado)
+    GLfloat matSpecular[]  = { 0.70f, 0.70f, 0.75f, 1.0f }; // Reflectancia especular metalica equilibrada
+    GLfloat matShininess[] = { 78.0f };                   // Brilho especular elegante (na faixa de 70 a 90)
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpecular);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, matShininess);
+
+    // Vincula glColor3f as propriedades ambiente e difusa do material
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
+    // Visualizador local: calcula os vetores de reflexao especular exatos para cada vertice em relacao a camera
+    glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+
+    // Separacao da cor especular: adiciona o brilho metalico brilhante sobre a textura BMP
+    #ifdef GL_LIGHT_MODEL_COLOR_CONTROL
+    glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
+    #endif
+
+    // Configuracao de Iluminacao Suavizada de 2 Pontos (Key Light e Fill Light)
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_LIGHT1);
+
+    // Luz 0: Principal (Key Light) - Incidencia moderada, evitando estourar as texturas
+    GLfloat light0Ambient[]  = { 0.18f, 0.18f, 0.20f, 1.0f };
+    GLfloat light0Diffuse[]  = { 0.80f, 0.80f, 0.85f, 1.0f };
+    GLfloat light0Specular[] = { 0.75f, 0.75f, 0.80f, 1.0f };
+    glLightfv(GL_LIGHT0, GL_AMBIENT,  light0Ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE,  light0Diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light0Specular);
+
+    // Luz 1: Preenchimento Suave (Fill Light) - Clareia sombras sem ofuscar
+    GLfloat light1Diffuse[]  = { 0.30f, 0.30f, 0.35f, 1.0f };
+    GLfloat light1Specular[] = { 0.30f, 0.30f, 0.35f, 1.0f };
+    glLightfv(GL_LIGHT1, GL_DIFFUSE,  light1Diffuse);
+    glLightfv(GL_LIGHT1, GL_SPECULAR, light1Specular);
 
     quadSphere = gluNewQuadric();
     gluQuadricNormals(quadSphere, GLU_SMOOTH);
@@ -110,9 +188,21 @@ void initRendering(void) {
     quadCylinder = gluNewQuadric();
     gluQuadricNormals(quadCylinder, GLU_SMOOTH);
 
+    // Carregamento das texturas multi-materiais da pasta _temp_textures
+    _texCarbonFiber = loadTexture(filenameCarbonFiber);
+    _texCorrugated  = loadTexture(filenameCorrugated);
+    _texGrayMetal   = loadTexture(filenameGrayMetal);
+    _texPerforated  = loadTexture(filenamePerforated);
+
+    // Fallback caso alguma textura nao seja encontrada
     _textureIdMetal1 = loadTexture(filenameTexMetal1);
-    _textureIdCylinder = _textureIdMetal1;
-    _textureIdSphere = _textureIdMetal1;
+    if (!_texCarbonFiber) _texCarbonFiber = _textureIdMetal1;
+    if (!_texCorrugated)  _texCorrugated  = _texCarbonFiber;
+    if (!_texGrayMetal)   _texGrayMetal   = _texCarbonFiber;
+    if (!_texPerforated)  _texPerforated  = _texCarbonFiber;
+
+    _textureIdCylinder = _texCarbonFiber;
+    _textureIdSphere   = _texCarbonFiber;
 }
 
 // Primitivas basicas herdadas de garra.cpp com suporte a textura
@@ -205,6 +295,9 @@ void resetCamera(void) {
 
 // Desenha uma mandibula articulada (pinca horizontal anatomica como a foto de referencia)
 void drawMandible(bool isRight) {
+    // 3. Mandibulas: gray_metal.bmp | Tom claro/cromado
+    applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
+
     glPushMatrix();
         float side = isRight ? 1.0f : -1.0f;
         // Posicionamento ancorado no focinho/bochecha frontal da cabeca (sem flutuar)
@@ -232,6 +325,9 @@ void drawMandible(bool isRight) {
 
 // Desenha uma antena bi-articulada proporcional e projetada para frente
 void drawAntenna(bool isRight) {
+    // 3. Antenas: gray_metal.bmp | Tom claro/cromado
+    applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
+
     glPushMatrix();
         float side = isRight ? 1.0f : -1.0f;
         // Posicionamento na fronte superior da cabeca
@@ -268,6 +364,9 @@ void drawHead(void) {
         glRotatef(headYaw,   0.0f, 0.0f, 1.0f);
         glRotatef(headPitch, 1.0f, 0.0f, 0.0f);
 
+        // 1. Carapaca Principal: Cranio e junta do pescoco (Fibra de Carbono escura)
+        applyTexture(_texCarbonFiber, 0.2f, 0.2f, 0.22f);
+
         // Junta esferica do pescoco
         drawSphere(0.35f);
 
@@ -277,6 +376,9 @@ void drawHead(void) {
             glScalef(0.85f, 1.05f, 0.75f);
             drawSphere(0.70f);
         glPopMatrix();
+
+        // 4. Olhos: Textura perforated_metal.bmp (tom contrastante escuro)
+        applyTexture(_texPerforated, 0.25f, 0.25f, 0.30f);
 
         // Olho Direito (+X)
         glPushMatrix();
@@ -292,11 +394,11 @@ void drawHead(void) {
             drawSphere(0.22f);
         glPopMatrix();
 
-        // Mandibulas em pinca articuladas e salientes
+        // Mandibulas em pinca articuladas e salientes (gray_metal.bmp)
         drawMandible(true);
         drawMandible(false);
 
-        // Antenas articuladas proporcionais
+        // Antenas articuladas proporcionais (gray_metal.bmp)
         drawAntenna(true);
         drawAntenna(false);
     glPopMatrix();
@@ -304,6 +406,9 @@ void drawHead(void) {
 
 // Desenha o torax central segmentado (Protorax, Mesotorax e Metatorax - raiz da hierarquia)
 void drawThorax(void) {
+    // 1. Carapaca Principal: Torax com textura carbon_fiber1.bmp e tom escuro
+    applyTexture(_texCarbonFiber, 0.2f, 0.2f, 0.22f);
+
     glPushMatrix();
         // Segmento 1: Protorax (anterior, mais robusto proximo ao pescoco)
         glPushMatrix();
@@ -338,6 +443,9 @@ void drawAbdomen(void) {
         glRotatef(abdomenYaw,   0.0f, 0.0f, 1.0f);
         glRotatef(abdomenPitch, 1.0f, 0.0f, 0.0f);
 
+        // 2. Cintura (Peciolo e Pos-peciolo): corrugated_iron.bmp | Tom prata/cinza medio
+        applyTexture(_texCorrugated, 0.8f, 0.8f, 0.85f);
+
         // 1. Peciolo (primeiro no da cintura)
         glPushMatrix();
             glScalef(0.28f, 0.35f, 0.28f);
@@ -351,7 +459,9 @@ void drawAbdomen(void) {
             drawSphere(1.0f);
         glPopMatrix();
 
-        // 3. Gaster (Abdomen volumoso principal em formato de gota/oval)
+        // 1. Carapaca Principal: Gaster (Abdomen volumoso): carbon_fiber1.bmp | Tom escuro
+        applyTexture(_texCarbonFiber, 0.2f, 0.2f, 0.22f);
+
         glTranslatef(0.0f, -1.45f, 0.05f);
         glRotatef(-8.0f, 1.0f, 0.0f, 0.0f); // Inclinacao natural do gaster
 
@@ -368,7 +478,9 @@ void drawAbdomen(void) {
             drawSphere(1.0f);
         glPopMatrix();
 
-        // 4. Ferrao do Gaster (Stinger mecanico cônico na extremidade traseira)
+        // 3. Ferrao do Gaster: gray_metal.bmp | Tom claro/cromado
+        applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
+
         glPushMatrix();
             glTranslatef(0.0f, -1.55f, -0.08f);
             drawSphere(0.12f); // Base do ferrao
@@ -426,10 +538,14 @@ void drawLeg(int side, int legIdx, float coxaYaw, float femurPitch, float tibiaP
         // 1. Referencial da Base / Quadril (ponto de encaixe lateral no Torax)
         glTranslatef(attachX, attachY, attachZ);
         glRotatef(s * (baseYaw + coxaYaw), 0.0f, 0.0f, 1.0f);
+
+        // 2. Articulacao do Quadril: corrugated_iron.bmp | Tom prata/cinza medio
+        applyTexture(_texCorrugated, 0.8f, 0.8f, 0.85f);
         drawSphere(0.10f);
 
         // --- ELO 1 DO BRACO MECANICO: REFERENCIAL DA COXA ---
-        // Rotaciona o referencial para alinhar o eixo +Z local com a coxa (-10 graus)
+        // 3. Segmento da Coxa: gray_metal.bmp | Tom claro/cromado
+        applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
         float coxaElev = -10.0f;
         float coxaLen  = 0.35f;
         glRotatef(s * (90.0f - coxaElev), 0.0f, 1.0f, 0.0f);
@@ -438,18 +554,26 @@ void drawLeg(int side, int legIdx, float coxaYaw, float femurPitch, float tibiaP
         // --- ELO 2 DO BRACO MECANICO: REFERENCIAL DO FEMUR (TROCANTER) ---
         // Translada puramente ao longo do eixo +Z local da coxa (padrao garra.cpp)
         glTranslatef(0.0f, 0.0f, coxaLen);
+
+        // 2. Articulacao do Trocanter: corrugated_iron.bmp | Tom prata/cinza medio
+        applyTexture(_texCorrugated, 0.8f, 0.8f, 0.85f);
         drawSphere(0.095f);
 
-        // Rotacao relativa entre o referencial da Coxa e o do Femur + articulacao femurPitch
+        // 3. Segmento do Femur: gray_metal.bmp | Tom claro/cromado
+        applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
         glRotatef(s * ((coxaElev - femurElev) - femurPitch), 0.0f, 1.0f, 0.0f);
         drawCylinder(0.075f, femurLen);
 
         // --- ELO 3 DO BRACO MECANICO: REFERENCIAL DA TIBIA (JOELHO) ---
         // Translada puramente ao longo do eixo +Z local do femur ate o joelho
         glTranslatef(0.0f, 0.0f, femurLen);
+
+        // 2. Articulacao do Joelho: corrugated_iron.bmp | Tom prata/cinza medio
+        applyTexture(_texCorrugated, 0.8f, 0.8f, 0.85f);
         drawSphere(0.085f);
 
-        // Rotacao relativa do joelho (entre o Femur e a Tibia) + articulacao tibiaPitch
+        // 3. Segmento da Tibia e Garra: gray_metal.bmp | Tom claro/cromado
+        applyTexture(_texGrayMetal, 0.9f, 0.9f, 0.95f);
         glRotatef(s * ((femurElev - tibiaElev) - tibiaPitch), 0.0f, 1.0f, 0.0f);
 
         float mainTibia = tibiaLen * 0.72f;
@@ -733,12 +857,6 @@ void handleResize(int w, int h) {
 void drawScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (textureOn) {
-        glEnable(GL_TEXTURE_2D);
-    } else {
-        glDisable(GL_TEXTURE_2D);
-    }
-
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
@@ -748,13 +866,32 @@ void drawScene(void) {
 
     gluLookAt(eyeX, eyeY, eyeZ, targetX, targetY, targetZ, 0.0, 0.0, 1.0);
 
-    // Grade de chao para referencia espacial
+    // Posicionamento espacial das 2 fontes de luz no referencial do mundo (fixas na cena)
+    GLfloat light0Pos[] = { 10.0f, -8.0f, 14.0f, 1.0f }; // Luz Principal (frontal direita alta)
+    GLfloat light1Pos[] = { -10.0f, 8.0f,  4.0f, 1.0f }; // Luz de Preenchimento Suave (traseira esquerda)
+    glLightfv(GL_LIGHT0, GL_POSITION, light0Pos);
+    glLightfv(GL_LIGHT1, GL_POSITION, light1Pos);
+
+    // Grade de chao (desenhada sem iluminacao e sem textura para contraste puro)
+    glDisable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
     drawReferenceGrid();
 
-    // Desenho hierarquico da Formiga Robo
-    glColor3f(1.0f, 1.0f, 1.0f);
+    // Habilita Iluminacao para o robo
+    glEnable(GL_LIGHTING);
 
-    // 1. Torax central segmentado (raiz da hierarquia)
+    // Garante modo GL_MODULATE ativo para interacao entre iluminacao e imagem BMP
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+    // Habilita GL_TEXTURE_2D antes de desenhar caso texturas estejam ativas
+    if (textureOn) {
+        glEnable(GL_TEXTURE_2D);
+    } else {
+        glDisable(GL_TEXTURE_2D);
+    }
+
+    // Desenho hierarquico da Formiga Robo com materiais especializados
+    // 1. Torax central segmentado (raiz da hierarquia) - Carapaca Fibra de Carbono
     drawThorax();
 
     // 2. Cabeca articulada e apendices (filha anterior do Torax)
@@ -765,6 +902,9 @@ void drawScene(void) {
 
     // 4. Seis patas articuladas anatomicas (3 de cada lado conectadas ao Torax)
     drawAllLegs();
+
+    // Desabilita GL_TEXTURE_2D apos o termino do desenho
+    glDisable(GL_TEXTURE_2D);
 
     glutSwapBuffers();
 }

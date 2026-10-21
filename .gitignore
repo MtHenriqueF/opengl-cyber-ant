@@ -23,6 +23,8 @@ entrega_final/
 
 # Imagens de origem / experimentacao de texturas
 assets/
+_temp_textures/
+*.py
 
 # GARANTIR que texturas, códigos, manual e binários Windows NÃO sejam ignorados
 !*.bmp
