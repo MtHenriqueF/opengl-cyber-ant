@@ -423,57 +423,42 @@ void drawLeg(int side, int legIdx, float coxaYaw, float femurPitch, float tibiaP
             tibiaLen  = 3.36f;
         }
 
-        // 1. Posiciona no ponto de encaixe lateral do torax
+        // 1. Referencial da Base / Quadril (ponto de encaixe lateral no Torax)
         glTranslatef(attachX, attachY, attachZ);
-
-        // 2. Rotacao horizontal Yaw da pata (base + controle dinamico)
         glRotatef(s * (baseYaw + coxaYaw), 0.0f, 0.0f, 1.0f);
-
-        // Junta basal da coxa (esfera no torax)
         drawSphere(0.10f);
 
-        // --- SEGMENTO 1: COXA ---
-        // Projeta a coxa para fora com leve inclinacao para baixo (-10 graus)
+        // --- ELO 1 DO BRACO MECANICO: REFERENCIAL DA COXA ---
+        // Rotaciona o referencial para alinhar o eixo +Z local com a coxa (-10 graus)
         float coxaElev = -10.0f;
         float coxaLen  = 0.35f;
-        glPushMatrix();
-            glRotatef(s * (90.0f - coxaElev), 0.0f, 1.0f, 0.0f);
-            drawCylinder(0.085f, coxaLen);
-        glPopMatrix();
+        glRotatef(s * (90.0f - coxaElev), 0.0f, 1.0f, 0.0f);
+        drawCylinder(0.085f, coxaLen);
 
-        // Translada com precisao analitica ate o trocanter (fim da coxa)
-        float radCoxa = coxaElev * (float)PI / 180.0f;
-        glTranslatef(s * coxaLen * (float)cos(radCoxa), 0.0f, coxaLen * (float)sin(radCoxa));
-
-        // Junta do trocanter (coxa-femur)
+        // --- ELO 2 DO BRACO MECANICO: REFERENCIAL DO FEMUR (TROCANTER) ---
+        // Translada puramente ao longo do eixo +Z local da coxa (padrao garra.cpp)
+        glTranslatef(0.0f, 0.0f, coxaLen);
         drawSphere(0.095f);
 
-        // --- SEGMENTO 2: FEMUR ---
-        // Sobe em angulo elevado ate o joelho alto (arco anatomico do inseto)
-        float curFemurElev = femurElev + femurPitch;
-        float radFemur = curFemurElev * (float)PI / 180.0f;
-        glPushMatrix();
-            glRotatef(s * (90.0f - curFemurElev), 0.0f, 1.0f, 0.0f);
-            drawCylinder(0.075f, femurLen);
-        glPopMatrix();
+        // Rotacao relativa entre o referencial da Coxa e o do Femur + articulacao femurPitch
+        glRotatef(s * ((coxaElev - femurElev) - femurPitch), 0.0f, 1.0f, 0.0f);
+        drawCylinder(0.075f, femurLen);
 
-        // Translada analiticamente ate o joelho
-        glTranslatef(s * femurLen * (float)cos(radFemur), 0.0f, femurLen * (float)sin(radFemur));
-
-        // Junta do joelho (femur-tibia)
+        // --- ELO 3 DO BRACO MECANICO: REFERENCIAL DA TIBIA (JOELHO) ---
+        // Translada puramente ao longo do eixo +Z local do femur ate o joelho
+        glTranslatef(0.0f, 0.0f, femurLen);
         drawSphere(0.085f);
 
-        // --- SEGMENTO 3: TIBIA E GARRA ---
-        // Desce em direcao ao solo no plano exato de apoio Z = -1.65f
-        float curTibiaElev = tibiaElev + tibiaPitch;
-        glRotatef(s * (90.0f - curTibiaElev), 0.0f, 1.0f, 0.0f);
+        // Rotacao relativa do joelho (entre o Femur e a Tibia) + articulacao tibiaPitch
+        glRotatef(s * ((femurElev - tibiaElev) - tibiaPitch), 0.0f, 1.0f, 0.0f);
 
         float mainTibia = tibiaLen * 0.72f;
         float clawLen   = tibiaLen * 0.28f;
         drawCylinder(0.055f, mainTibia);
-        glTranslatef(0.0f, 0.0f, mainTibia);
 
-        // Garra afilada tocando o piso
+        // --- ELO 4 DO BRACO MECANICO: REFERENCIAL DA GARRA (TARSO) ---
+        // Translada puramente ao longo do eixo +Z local da tibia ate a ponta da garra
+        glTranslatef(0.0f, 0.0f, mainTibia);
         drawCone(0.055f, clawLen);
     glPopMatrix();
 }
