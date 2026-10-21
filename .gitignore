@@ -21,6 +21,9 @@ entrega_final/
 .vscode/
 .DS_Store
 
+# Imagens de origem / experimentacao de texturas
+assets/
+
 # GARANTIR que texturas, códigos, manual e binários Windows NÃO sejam ignorados
 !*.bmp
 !*.cpp
