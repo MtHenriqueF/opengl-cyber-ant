@@ -1,5 +1,5 @@
 # ==============================================================================
-# Makefile - Computação Gráfica (IME 04-10842) - Trabalho Final 2026.1
+# Makefile - Computação Gráfica (UERJ) - Trabalho Final 2026.1
 # Projeto: Simulador de Formiga Robô 3D em OpenGL
 # ==============================================================================
 

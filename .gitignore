@@ -17,14 +17,11 @@ test_bmp_loader
 entrega_final/
 *.zip
 
-# Arquivos de sistema / IDE
+# Arquivos de sistema / IDE e scripts auxiliares
 .vscode/
 .DS_Store
-
-# Imagens de origem / experimentacao de texturas
-assets/
-_temp_textures/
 *.py
+*.tex
 
 # GARANTIR que texturas, códigos, manual e binários Windows NÃO sejam ignorados
 !*.bmp
