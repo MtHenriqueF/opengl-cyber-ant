@@ -1,7 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 /*
  * ==============================================================================
- * Computacao Grafica (IME 04-10842) - Trabalho Final 2026.1
+ * Computacao Grafica - Trabalho Final 2026.1
  * Projeto: Simulador de Formiga Robo 3D em OpenGL (Cyber Ant)
  * Autor: Mateus Henrique Freitas Maciel
  * Ponto de partida: garra.cpp
@@ -23,12 +23,12 @@
 
 using namespace std;
 
-// Caminho relativo para textura padrao e texturas especializadas de _temp_textures
+// Caminho relativo para textura padrao e texturas especializadas de assets/textures
 const char* filenameTexMetal1   = "metalTexture1.bmp";
-const char* filenameCarbonFiber = "_temp_textures/carbon_fiber1.bmp";
-const char* filenameCorrugated  = "_temp_textures/corrugated_iron.bmp";
-const char* filenameGrayMetal   = "_temp_textures/gray_metal.bmp";
-const char* filenamePerforated  = "_temp_textures/perforated_metal.bmp";
+const char* filenameCarbonFiber = "assets/textures/carbon_fiber1.bmp";
+const char* filenameCorrugated  = "assets/textures/corrugated_iron.bmp";
+const char* filenameGrayMetal   = "assets/textures/gray_metal.bmp";
+const char* filenamePerforated  = "assets/textures/perforated_metal.bmp";
 
 // Identificadores de textura multi-materiais (Fase 5)
 GLuint _texCarbonFiber   = 0; // 1. Carapaca Principal (Cabeca, Torax e Abdomen/Gaster)
@@ -94,10 +94,10 @@ GLuint loadTexture(const char* filename) {
     GLuint textureId = 0;
     RgbImage theTexMap(filename);
 
-    // Tenta fallback com prefixo _temp_textures/ caso seja passado caminho relativo direto
+    // Tenta fallback com prefixo assets/textures/ caso seja passado caminho relativo direto
     if (theTexMap.GetErrorCode() != 0 || theTexMap.GetNumCols() <= 0) {
         char altPath[256];
-        snprintf(altPath, sizeof(altPath), "_temp_textures/%s", filename);
+        snprintf(altPath, sizeof(altPath), "assets/textures/%s", filename);
         theTexMap.LoadBmpFile(altPath);
     }
 
@@ -189,7 +189,7 @@ void initRendering(void) {
     quadCylinder = gluNewQuadric();
     gluQuadricNormals(quadCylinder, GLU_SMOOTH);
 
-    // Carregamento das texturas multi-materiais da pasta _temp_textures
+    // Carregamento das texturas multi-materiais da pasta assets/textures
     _texCarbonFiber = loadTexture(filenameCarbonFiber);
     _texCorrugated  = loadTexture(filenameCorrugated);
     _texGrayMetal   = loadTexture(filenameGrayMetal);

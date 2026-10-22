@@ -1,9 +1,8 @@
 # Simulador 3D de Formiga Robô em OpenGL (Cyber Ant) 🐜🤖
 
-Projeto Final da disciplina de **Computação Gráfica (IME 04-10842) -- 2026.1**  
-**Instituto Militar de Engenharia (IME)**  
+Projeto Final da disciplina de **Computação Gráfica -- 2026.1**  
+**Universidade do Estado do Rio de Janeiro (UERJ)**  
 **Autor:** Mateus Henrique Freitas Maciel  
-**Professor:** Paulo Cezar Pinto Carvalho  
 
 ![Preview do Simulador](docs/screenshot_formiga.png)
 
@@ -56,7 +55,7 @@ O código fonte possui compatibilidade nativa com Windows (diretiva `#define _CR
 ```bash
 g++ -O2 formiga.cpp RgbImage.cpp -lfreeglut -lopengl32 -lglu32 -o formiga.exe
 ```
-> **Nota:** Certifique-se de manter a biblioteca `freeglut.dll` e a pasta `_temp_textures/` no mesmo diretório do executável `formiga.exe`.
+> **Nota:** Certifique-se de manter a biblioteca `freeglut.dll` e a pasta `assets/textures/` no mesmo diretório do executável `formiga.exe`.
 
 ---
 
@@ -133,16 +132,16 @@ Durante a **Fase de Apoio** ($\sin \phi \le 0$), a pata permanece cravada no pla
 
 ## 🎨 Mapeamento de Texturas BMP 24-bits
 
-O projeto utiliza **4 texturas especializadas** em formato BMP de 24-bits sem compressão RLE, localizadas na pasta `_temp_textures/`:
+O projeto utiliza **4 texturas especializadas** em formato BMP de 24-bits sem compressão RLE, localizadas na pasta `assets/textures/`:
 
 | Arquivo BMP | Localização | Cor Base (`glColor3f`) | Partes Anatômicas Mapeadas |
 | :--- | :--- | :--- | :--- |
-| `carbon_fiber1.bmp` | `_temp_textures/` | `(0.20, 0.20, 0.22)` (Escuro) | **Carapaça Principal:** Crânio, tórax (3 segmentos) e gáster. |
-| `corrugated_iron.bmp` | `_temp_textures/` | `(0.80, 0.80, 0.85)` (Prata) | **Cintura e Juntas:** Pecíolo/pós-pecíolo e juntas de quadril, trocanter e joelho. |
-| `gray_metal.bmp` | `_temp_textures/` | `(0.90, 0.90, 0.95)` (Cromo) | **Membros e Apêndices:** Cilindros das pernas, garras, antenas, mandíbulas e ferrão. |
-| `perforated_metal.bmp` | `_temp_textures/` | `(0.25, 0.25, 0.30)` (Metálico) | **Olhos:** Hemisférios oculares com textura perfurada industrial. |
+| `carbon_fiber1.bmp` | `assets/textures/` | `(0.20, 0.20, 0.22)` (Escuro) | **Carapaça Principal:** Crânio, tórax (3 segmentos) e gáster. |
+| `corrugated_iron.bmp` | `assets/textures/` | `(0.80, 0.80, 0.85)` (Prata) | **Cintura e Juntas:** Pecíolo/pós-pecíolo e juntas de quadril, trocanter e joelho. |
+| `gray_metal.bmp` | `assets/textures/` | `(0.90, 0.90, 0.95)` (Cromo) | **Membros e Apêndices:** Cilindros das pernas, garras, antenas, mandíbulas e ferrão. |
+| `perforated_metal.bmp` | `assets/textures/` | `(0.25, 0.25, 0.30)` (Metálico) | **Olhos:** Hemisférios oculares com textura perfurada industrial. |
 
-*Fallback:* Caso a pasta `_temp_textures/` não esteja presente, o simulador carrega automaticamente a textura padrão `metalTexture1.bmp` da raiz.
+*Fallback:* Caso a pasta `assets/textures/` não esteja presente, o simulador carrega automaticamente a textura padrão `metalTexture1.bmp` da raiz.
 
 ---
 
@@ -174,4 +173,4 @@ O projeto utiliza **4 texturas especializadas** em formato BMP de 24-bits sem co
 
 ---
 
-*Desenvolvido para a disciplina de Computação Gráfica (IME 04-10842) - Trabalho Final 2026.1.*
+*Desenvolvido para a disciplina de Computação Gráfica (UERJ) - Trabalho Final 2026.1.*
