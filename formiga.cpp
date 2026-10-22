@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <GL/glut.h>
 #include "RgbImage.h"
@@ -632,10 +633,69 @@ void drawAllLegs(void) {
     }
 }
 
+// Salva uma captura de tela do framebuffer em formato BMP 24-bits sem compressao
+void saveScreenshot(const char* filename, int width, int height) {
+    int rowPadding = (4 - (width * 3) % 4) % 4;
+    int rowSize = width * 3 + rowPadding;
+    int dataSize = rowSize * height;
+    int fileSize = 54 + dataSize;
+
+    unsigned char* pixels = (unsigned char*)malloc(width * height * 3);
+    if (!pixels) return;
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+
+    FILE* f = fopen(filename, "wb");
+    if (f) {
+        unsigned char fileHeader[14] = {
+            'B', 'M',
+            (unsigned char)(fileSize), (unsigned char)(fileSize >> 8), (unsigned char)(fileSize >> 16), (unsigned char)(fileSize >> 24),
+            0, 0, 0, 0,
+            54, 0, 0, 0
+        };
+        unsigned char infoHeader[40] = {
+            40, 0, 0, 0,
+            (unsigned char)(width), (unsigned char)(width >> 8), (unsigned char)(width >> 16), (unsigned char)(width >> 24),
+            (unsigned char)(height), (unsigned char)(height >> 8), (unsigned char)(height >> 16), (unsigned char)(height >> 24),
+            1, 0,
+            24, 0,
+            0, 0, 0, 0,
+            (unsigned char)(dataSize), (unsigned char)(dataSize >> 8), (unsigned char)(dataSize >> 16), (unsigned char)(dataSize >> 24),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        };
+        fwrite(fileHeader, 1, 14, f);
+        fwrite(infoHeader, 1, 40, f);
+
+        unsigned char pad[3] = {0, 0, 0};
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int idx = (y * width + x) * 3;
+                unsigned char r = pixels[idx];
+                unsigned char g = pixels[idx + 1];
+                unsigned char b = pixels[idx + 2];
+                fputc(b, f);
+                fputc(g, f);
+                fputc(r, f);
+            }
+            if (rowPadding > 0) {
+                fwrite(pad, 1, rowPadding, f);
+            }
+        }
+        fclose(f);
+        printf("Captura de tela salva em: %s\n", filename);
+    }
+    free(pixels);
+}
+
 void handleKeypress(unsigned char key, int /*x*/, int /*y*/) {
     switch (key) {
     case 27: // Tecla ESC
         exit(0);
+    // Captura de tela para documentacao (P / p)
+    case 'p':
+    case 'P':
+        saveScreenshot("docs/screenshot_formiga.bmp", 900, 700);
+        break;
     // Modo de Caminhada (Tripod Gait): Liga/Desliga marcha automatica (Espaco)
     case ' ':
         isWalking = !isWalking;
@@ -929,6 +989,14 @@ int main(int argc, char** argv) {
     glutCreateWindow("Simulador Formiga Robo 3D - Cyber Ant");
 
     initRendering();
+    if (argc > 1 && strcmp(argv[1], "--screenshot") == 0) {
+        handleResize(900, 700);
+        drawScene();
+        const char* path = (argc > 2) ? argv[2] : "docs/screenshot_formiga.bmp";
+        saveScreenshot(path, 900, 700);
+        return 0;
+    }
+
     glutDisplayFunc(drawScene);
     glutKeyboardFunc(handleKeypress);
     glutSpecialFunc(handleSpecialKeypress);
